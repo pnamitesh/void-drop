@@ -196,7 +196,8 @@ async function handleCreateRoom() {
     status: "waiting", // "waiting" | "active" | "finished"
     createdAt: Date.now(),
     startedAt: null,
-    participants
+    participants,
+    identityMap: {}
   };
 
   await set(roomRef, roomData);
@@ -211,10 +212,79 @@ async function handleCreateRoom() {
   joinRoomBtn.disabled = false;
 }
 
+// async function handleJoinRoom() {
+//   setupError.textContent = "";
+//   const name = displayNameInput.value.trim();
+//   let code = roomCodeInput.value.trim().toUpperCase();
+
+//   if (!name) {
+//     setupError.textContent = "Please enter your name.";
+//     return;
+//   }
+
+//   if (!code || code.length < 4) {
+//     setupError.textContent = "Please enter a valid room code.";
+//     return;
+//   }
+
+//   createRoomBtn.disabled = true;
+//   joinRoomBtn.disabled = true;
+
+//   currentUser.name = name;
+//   saveUser();
+
+//   const roomRef = ref(db, "rooms/" + code);
+//   const snap = await get(roomRef);
+//   if (!snap.exists()) {
+//     setupError.textContent = "Room not found. Check the code.";
+//     createRoomBtn.disabled = false;
+//     joinRoomBtn.disabled = false;
+//     return;
+//   }
+
+//   const roomData = snap.val();
+
+//   if (roomData.status === "finished") {
+//     setupError.textContent = "This pact has already ended.";
+//     createRoomBtn.disabled = false;
+//     joinRoomBtn.disabled = false;
+//     return;
+//   }
+
+//   const participants = roomData.participants || {};
+//   const existingIds = Object.keys(participants);
+
+//   // Limit to 2 participants
+//   if (existingIds.length >= 2 && !participants[currentUser.id]) {
+//     setupError.textContent = "This room already has two participants.";
+//     createRoomBtn.disabled = false;
+//     joinRoomBtn.disabled = false;
+//     return;
+//   }
+
+//   currentParticipantId = currentUser.id;
+
+//   // Add / update self as participant
+//   const updates = {};
+//   updates["rooms/" + code + "/participants/" + currentParticipantId] = {
+//     name: currentUser.name,
+//     createdAt: Date.now()
+//   };
+//   await update(ref(db), updates);
+
+//   currentRoomId = code;
+//   currentRoomRef = roomRef;
+
+//   attachRoomListener(code);
+//   switchScreen("room");
+
+//   createRoomBtn.disabled = false;
+//   joinRoomBtn.disabled = false;
+// }
 async function handleJoinRoom() {
   setupError.textContent = "";
   const name = displayNameInput.value.trim();
-  let code = roomCodeInput.value.trim().toUpperCase();
+  const code = roomCodeInput.value.trim().toUpperCase();
 
   if (!name) {
     setupError.textContent = "Please enter your name.";
@@ -229,57 +299,73 @@ async function handleJoinRoom() {
   createRoomBtn.disabled = true;
   joinRoomBtn.disabled = true;
 
+  // Read room
+  const roomRef = ref(db, "rooms/" + code);
+  const snap = await get(roomRef);
+
+  if (!snap.exists()) {
+    setupError.textContent = "Room not found.";
+    resetButtons();
+    return;
+  }
+
+  const room = snap.val();
+
+  // --- Persistent identity check ---
+  const identityMap = room.identityMap || {};
+
+  if (identityMap[name]) {
+    // User already exists in this room
+    currentParticipantId = identityMap[name];
+    currentUser.name = name;
+    saveUser();
+
+    switchToRoom(code);
+    resetButtons();
+    return;
+  }
+
+  // --- NEW participant joining ---
+  const participants = room.participants || {};
+  const count = Object.keys(participants).length;
+
+  if (count >= 2) {
+    setupError.textContent = "This room already has 2 participants.";
+    resetButtons();
+    return;
+  }
+
+  // create new userId
+  currentParticipantId = "u_" + Math.random().toString(36).slice(2, 10);
   currentUser.name = name;
   saveUser();
 
-  const roomRef = ref(db, "rooms/" + code);
-  const snap = await get(roomRef);
-  if (!snap.exists()) {
-    setupError.textContent = "Room not found. Check the code.";
-    createRoomBtn.disabled = false;
-    joinRoomBtn.disabled = false;
-    return;
-  }
-
-  const roomData = snap.val();
-
-  if (roomData.status === "finished") {
-    setupError.textContent = "This pact has already ended.";
-    createRoomBtn.disabled = false;
-    joinRoomBtn.disabled = false;
-    return;
-  }
-
-  const participants = roomData.participants || {};
-  const existingIds = Object.keys(participants);
-
-  // Limit to 2 participants
-  if (existingIds.length >= 2 && !participants[currentUser.id]) {
-    setupError.textContent = "This room already has two participants.";
-    createRoomBtn.disabled = false;
-    joinRoomBtn.disabled = false;
-    return;
-  }
-
-  currentParticipantId = currentUser.id;
-
-  // Add / update self as participant
+  // write to DB: add identity + participant
   const updates = {};
-  updates["rooms/" + code + "/participants/" + currentParticipantId] = {
-    name: currentUser.name,
+  updates[`rooms/${code}/identityMap/${name}`] = currentParticipantId;
+  updates[`rooms/${code}/participants/${currentParticipantId}`] = {
+    name,
     createdAt: Date.now()
   };
+
   await update(ref(db), updates);
 
-  currentRoomId = code;
-  currentRoomRef = roomRef;
+  switchToRoom(code);
+  resetButtons();
+}
 
-  attachRoomListener(code);
-  switchScreen("room");
-
+function resetButtons() {
   createRoomBtn.disabled = false;
   joinRoomBtn.disabled = false;
 }
+
+function switchToRoom(code) {
+  currentRoomId = code;
+  currentRoomRef = ref(db, "rooms/" + code);
+  attachRoomListener(code);
+  switchScreen("room");
+}
+
 
 function attachRoomListener(roomId) {
   const roomRef = ref(db, "rooms/" + roomId);
