@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Void Drop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <body>
+  <div id="voidHalo"></div>
+
+  <script>
+    // particles
+    for (let i = 0; i < 70; i++) {
+      const p = document.createElement("div");
+      p.classList.add("particle");
+      p.style.left = Math.random() * window.innerWidth + "px";
+      p.style.top = Math.random() * window.innerHeight + "px";
+      p.style.animationDuration = (5 + Math.random() * 5) + "s";
+      p.style.animationDelay = Math.random() * 3 + "s";
+      document.body.appendChild(p);
+    }
+  </script>
+
+  <div id="app"></div>
+</body>
+
+  <div id="app">
+    <header class="app-header">
+      <h1 style="background: linear-gradient(135deg, #7c5cff 0%, #d66bff 100%); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 30px rgba(124, 92, 255, 0.5);">
+  Void Drop
+</h1>
+      <p class="subtitle">A 7-day connection ritual for two people who choose depth over noise.</p>
+    </header>
+
+    <!-- Screen: Setup -->
+    <main id="screen-setup" class="screen active">
+      <div class="card">
+        <h2>Start or Join a Pact</h2>
+        <label>
+          Your name
+          <input type="text" id="displayNameInput" placeholder="Enter your name" />
+        </label>
+
+        <div class="split">
+          <div class="block">
+            <h3>Create Room</h3>
+            <button id="createRoomBtn" class="btn primary">Create New Pact</button>
+            <p class="hint">You’ll get a 6-letter code to share with your friend.</p>
+          </div>
+          <div class="block">
+            <h3>Join Room</h3>
+            <label>
+              Room code
+              <input type="text" id="roomCodeInput" placeholder="e.g. A1B2C3" maxlength="6" />
+            </label>
+            <button id="joinRoomBtn" class="btn">Join Pact</button>
+          </div>
+        </div>
+
+        <p id="setupError" class="error"></p>
+      </div>
+
+      <section class="info">
+        <h3>How it works</h3>
+        <ul>
+          <li>You and one friend join the same room.</li>
+          <li>For 7 days, you get slow, reflective prompts.</li>
+          <li>You can keep some whispers private, or share them with each other.</li>
+          <li>At the end, you can choose what to reveal.</li>
+        </ul>
+      </section>
+    </main>
+
+    <!-- Screen: Room Waiting -->
+    <main id="screen-room" class="screen">
+      <div class="card">
+        <h2>Room: <span id="roomIdLabel"></span></h2>
+        <p class="hint">Share this code with your friend so they can join:</p>
+        <div class="room-code-row">
+          <span id="roomCodeBig"></span>
+          <button id="copyCodeBtn" class="btn small">Copy</button>
+        </div>
+
+        <h3>Participants</h3>
+        <ul id="participantsList" class="participants-list"></ul>
+
+        <p id="roomStatusText"></p>
+
+        <button id="startGameBtn" class="btn primary hidden">Start 7-Day Pact</button>
+        <button id="leaveRoomBtn" class="btn ghost">Leave Room</button>
+      </div>
+    </main>
+
+    <!-- Screen: Game -->
+    <main id="screen-game" class="screen">
+      <div class="layout">
+        <section class="card">
+          <header class="section-header">
+            <div>
+              <h2>Today’s Whisper</h2>
+              <p class="muted">Day <span id="currentDayLabel"></span> of 7</p>
+            </div>
+            <button id="signOutBtn" class="btn small ghost">Exit</button>
+          </header>
+
+          <div id="taskContainer">
+            <h3 id="taskTitle"></h3>
+            <p id="taskPrompt" class="task-prompt"></p>
+          </div>
+
+          <label class="full">
+            Your response
+            <textarea id="responseInput" rows="5" placeholder="Write what you really feel, not what sounds good."></textarea>
+          </label>
+
+          <div class="actions-row">
+            <button id="savePrivateBtn" class="btn ghost">Save privately</button>
+            <button id="shareWithPartnerBtn" class="btn primary">Share with partner</button>
+          </div>
+
+          <p id="gameInfo" class="hint"></p>
+        </section>
+
+        <section class="card side">
+          <h3>Shared Whispers</h3>
+          <p class="muted small">You will only ever see what your partner chose to share.</p>
+          <div id="sharedList" class="whispers-list"></div>
+
+          <h3 class="mt">Your Journal</h3>
+          <p class="muted small">Visible only to you.</p>
+          <div id="journalList" class="whispers-list"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <footer class="app-footer">
+    <p>Built for humans who want depth over noise.</p>
+  </footer>
+
+  <!-- Firebase + App -->
+  <script type="module" src="firebase.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
