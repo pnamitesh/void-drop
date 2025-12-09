@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>Void Drop</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
-    <body>
   <div id="voidHalo"></div>
 
   <script>
-    // particles
+    // Particles setup
     for (let i = 0; i < 70; i++) {
       const p = document.createElement("div");
       p.classList.add("particle");
@@ -23,18 +24,15 @@
     }
   </script>
 
-  <div id="app"></div>
-</body>
-
   <div id="app">
     <header class="app-header">
-      <h1 style="background: linear-gradient(135deg, #7c5cff 0%, #d66bff 100%); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 30px rgba(124, 92, 255, 0.5);">
-  Void Drop
-</h1>
+      <h1
+        style="background: linear-gradient(135deg, #7c5cff 0%, #d66bff 100%); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 30px rgba(124, 92, 255, 0.5);">
+        Void Drop
+      </h1>
       <p class="subtitle">A 7-day connection ritual for two people who choose depth over noise.</p>
     </header>
 
-    <!-- Screen: Setup -->
     <main id="screen-setup" class="screen active">
       <div class="card">
         <h2>Start or Join a Pact</h2>
@@ -73,7 +71,6 @@
       </section>
     </main>
 
-    <!-- Screen: Room Waiting -->
     <main id="screen-room" class="screen">
       <div class="card">
         <h2>Room: <span id="roomIdLabel"></span></h2>
@@ -93,7 +90,6 @@
       </div>
     </main>
 
-    <!-- Screen: Game -->
     <main id="screen-game" class="screen">
       <div class="layout">
         <section class="card">
@@ -112,7 +108,8 @@
 
           <label class="full">
             Your response
-            <textarea id="responseInput" rows="5" placeholder="Write what you really feel, not what sounds good."></textarea>
+            <textarea id="responseInput" rows="5"
+              placeholder="Write what you really feel, not what sounds good."></textarea>
           </label>
 
           <div class="actions-row">
@@ -125,8 +122,8 @@
 
         <section class="card side">
           <h3>Shared Whispers</h3>
-          <p class="muted small">You will only ever see what your partner chose to share.</p>
-          <div id="sharedList" class="whispers-list"></div>
+          <p class="muted small">A conversation of shared truths.</p>
+          <div id="sharedList" class="chat-container"></div>
 
           <h3 class="mt">Your Journal</h3>
           <p class="muted small">Visible only to you.</p>
@@ -140,8 +137,8 @@
     <p>Built for humans who want depth over noise.</p>
   </footer>
 
-  <!-- Firebase + App -->
   <script type="module" src="firebase.js"></script>
   <script type="module" src="app.js"></script>
 </body>
+
 </html>

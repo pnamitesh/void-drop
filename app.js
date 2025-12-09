@@ -1,58 +1,56 @@
-// app.js
 import { db, ref, set, push, onValue, update, get } from "./firebase.js";
 
-// ---------- Simple client-side "auth" ----------
+// ---------- Client-side "auth" ----------
 const LOCAL_USER_KEY = "whisper_pact_user";
 let currentUser = loadOrCreateUser();
 let currentRoomId = null;
-let currentRoomRef = null;
 let currentParticipantId = null;
 let currentProgress = null;
 
-// 7-day task list (you can edit text later)
+// 7-day task list
 const TASKS = [
   {
     id: 0,
     title: "The First Impulse",
     prompt:
-      "Think of the last time you wanted to text or call them but stopped. What did you stop yourself from saying?"
+      "Think of the last time you wanted to text or call them but stopped. What did you stop yourself from saying?",
   },
   {
     id: 1,
     title: "Underneath the Message",
     prompt:
-      "Pick any recent message you sent them. What did your heart actually want to say behind those words?"
+      "Pick any recent message you sent them. What did your heart actually want to say behind those words?",
   },
   {
     id: 2,
     title: "The Unsent Version",
     prompt:
-      "Write the unsent version of something you softened or joked about. How would it sound if you were 10% more honest?"
+      "Write the unsent version of something you softened or joked about. How would it sound if you were 10% more honest?",
   },
   {
     id: 3,
     title: "The Hidden Fear",
     prompt:
-      "What is a small fear you feel in this connection that you rarely put into words?"
+      "What is a small fear you feel in this connection that you rarely put into words?",
   },
   {
     id: 4,
     title: "The Quiet Gratitude",
     prompt:
-      "Write about something they did that meant a lot to you, but you never fully acknowledged out loud."
+      "Write about something they did that meant a lot to you, but you never fully acknowledged out loud.",
   },
   {
     id: 5,
     title: "The Version of You With Them",
     prompt:
-      "Describe the version of you that appears when you are with them. What do you like and dislike about that version?"
+      "Describe the version of you that appears when you are with them. What do you like and dislike about that version?",
   },
   {
     id: 6,
     title: "If This Was the Last Whisper",
     prompt:
-      "If you could send them one message that you knew they would truly hear, what would you say?"
-  }
+      "If you could send them one message that you knew they would truly hear, what would you say?",
+  },
 ];
 
 // ---------- DOM elements ----------
@@ -99,7 +97,6 @@ savePrivateBtn.addEventListener("click", () => handleSubmitResponse(false));
 shareWithPartnerBtn.addEventListener("click", () => handleSubmitResponse(true));
 signOutBtn.addEventListener("click", () => {
   currentRoomId = null;
-  currentRoomRef = null;
   switchScreen("setup");
 });
 
@@ -119,14 +116,9 @@ function loadOrCreateUser() {
   if (raw) {
     try {
       return JSON.parse(raw);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
-  const user = {
-    id: "u_" + Math.random().toString(36).slice(2, 10),
-    name: ""
-  };
+  const user = { id: "u_" + Math.random().toString(36).slice(2, 10), name: "" };
   localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(user));
   return user;
 }
@@ -138,9 +130,8 @@ function saveUser() {
 function randomRoomId() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let out = "";
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 6; i++)
     out += chars[Math.floor(Math.random() * chars.length)];
-  }
   return out;
 }
 
@@ -151,12 +142,9 @@ function formatTime(ts) {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    day: "2-digit",
-    month: "short"
   });
 }
 
-// Calculate day 1–7 based on startedAt
 function computeDay(startedAt) {
   if (!startedAt) return 1;
   const now = Date.now();
@@ -176,42 +164,25 @@ async function handleCreateRoom() {
 
   createRoomBtn.disabled = true;
   joinRoomBtn.disabled = true;
-
   currentUser.name = name;
   saveUser();
 
   const roomId = randomRoomId();
-  const roomRef = ref(db, "rooms/" + roomId);
-
-  const participants = {};
   currentParticipantId = currentUser.id;
-  participants[currentParticipantId] = {
-    name: currentUser.name,
-    createdAt: Date.now()
-  };
 
   const roomData = {
     roomId,
-    status: "waiting", // "waiting" | "active" | "finished"
+    status: "waiting",
     createdAt: Date.now(),
     startedAt: null,
-    participants,
-    // ★ identity map for persistent rejoin
-    identityMap: {
-      [currentUser.name]: currentParticipantId
-    }
+    participants: {
+      [currentParticipantId]: { name: currentUser.name, createdAt: Date.now() },
+    },
+    identityMap: { [currentUser.name]: currentParticipantId },
   };
 
-  await set(roomRef, roomData);
-
-  currentRoomId = roomId;
-  currentRoomRef = roomRef;
-
-  attachRoomListener(roomId);
-  switchScreen("room");
-
-  createRoomBtn.disabled = false;
-  joinRoomBtn.disabled = false;
+  await set(ref(db, "rooms/" + roomId), roomData);
+  switchToRoom(roomId);
 }
 
 async function handleJoinRoom() {
@@ -219,61 +190,39 @@ async function handleJoinRoom() {
   const name = displayNameInput.value.trim();
   const code = roomCodeInput.value.trim().toUpperCase();
 
-  if (!name) {
-    setupError.textContent = "Please enter your name.";
-    return;
-  }
-
-  if (!code || code.length < 4) {
-    setupError.textContent = "Please enter a valid room code.";
+  if (!name || !code || code.length < 4) {
+    setupError.textContent = "Please enter name and valid code.";
     return;
   }
 
   createRoomBtn.disabled = true;
   joinRoomBtn.disabled = true;
 
-  const roomRef = ref(db, "rooms/" + code);
-  const snap = await get(roomRef);
+  const snap = await get(ref(db, "rooms/" + code));
   if (!snap.exists()) {
-    setupError.textContent = "Room not found. Check the code.";
-    resetButtons();
+    setupError.textContent = "Room not found.";
+    createRoomBtn.disabled = false;
+    joinRoomBtn.disabled = false;
     return;
   }
 
   const room = snap.val();
   const participants = room.participants || {};
   const identityMap = room.identityMap || {};
-  const count = Object.keys(participants).length;
 
-  // --- Persistent identity check ---
+  // Rejoin or Join
   if (identityMap[name]) {
     currentParticipantId = identityMap[name];
-    currentUser.name = name;
-    saveUser();
-
-    // Ensure participant entry exists (in case it was removed earlier)
-    if (!participants[currentParticipantId]) {
-      const updates = {};
-      updates[`rooms/${code}/participants/${currentParticipantId}`] = {
-        name,
-        createdAt: Date.now()
-      };
-      await update(ref(db), updates);
+  } else {
+    if (Object.keys(participants).length >= 2) {
+      setupError.textContent = "Room full.";
+      createRoomBtn.disabled = false;
+      joinRoomBtn.disabled = false;
+      return;
     }
-
-    switchToRoom(code);
-    resetButtons();
-    return;
+    currentParticipantId = "u_" + Math.random().toString(36).slice(2, 10);
   }
 
-  // --- NEW participant joining ---
-  if (count >= 2) {
-    setupError.textContent = "This room already has 2 participants.";
-    resetButtons();
-    return;
-  }
-
-  currentParticipantId = "u_" + Math.random().toString(36).slice(2, 10);
   currentUser.name = name;
   saveUser();
 
@@ -281,52 +230,33 @@ async function handleJoinRoom() {
   updates[`rooms/${code}/identityMap/${name}`] = currentParticipantId;
   updates[`rooms/${code}/participants/${currentParticipantId}`] = {
     name,
-    createdAt: Date.now()
+    createdAt: Date.now(),
   };
 
   await update(ref(db), updates);
-
   switchToRoom(code);
-  resetButtons();
-}
-
-function resetButtons() {
-  createRoomBtn.disabled = false;
-  joinRoomBtn.disabled = false;
 }
 
 function switchToRoom(code) {
   currentRoomId = code;
-  currentRoomRef = ref(db, "rooms/" + code);
   attachRoomListener(code);
   switchScreen("room");
+  createRoomBtn.disabled = false;
+  joinRoomBtn.disabled = false;
 }
 
 function attachRoomListener(roomId) {
-  const roomRef = ref(db, "rooms/" + roomId);
-  onValue(roomRef, (snap) => {
+  onValue(ref(db, "rooms/" + roomId), (snap) => {
     if (!snap.exists()) {
-      if (currentRoomId === roomId) {
-        currentRoomId = null;
-        switchScreen("setup");
-      }
+      currentRoomId = null;
+      switchScreen("setup");
       return;
     }
-
     const room = snap.val();
     renderRoom(room);
 
-    if (room.status === "active") {
-      if (!screenGame.classList.contains("active")) {
-        switchScreen("game");
-      }
-      renderGame(room);
-      attachEntriesListener(roomId);
-      attachProgressListener(roomId);
-    } else if (room.status === "finished") {
-      roomStatusText.textContent =
-        "This pact has ended. You can still read what was shared.";
-      switchScreen("game");
+    if (room.status === "active" || room.status === "finished") {
+      if (!screenGame.classList.contains("active")) switchScreen("game");
       renderGame(room);
       attachEntriesListener(roomId);
       attachProgressListener(roomId);
@@ -336,185 +266,157 @@ function attachRoomListener(roomId) {
 
 async function handleStartGame() {
   if (!currentRoomId) return;
-
-  const updates = {};
-  updates["rooms/" + currentRoomId + "/status"] = "active";
-  updates["rooms/" + currentRoomId + "/startedAt"] = Date.now();
-  await update(ref(db), updates);
+  await update(ref(db, `rooms/${currentRoomId}`), {
+    status: "active",
+    startedAt: Date.now(),
+  });
 }
 
 async function handleLeaveRoom() {
-  if (!currentRoomId || !currentParticipantId) {
-    switchScreen("setup");
-    return;
-  }
-
-  const updates = {};
-  updates["rooms/" + currentRoomId + "/participants/" + currentParticipantId] =
-    null;
-  await update(ref(db), updates);
-
+  if (!currentRoomId || !currentParticipantId) return;
+  await update(
+    ref(db, `rooms/${currentRoomId}/participants/${currentParticipantId}`),
+    null
+  );
   currentRoomId = null;
-  currentRoomRef = null;
   switchScreen("setup");
 }
 
 function renderRoom(room) {
   roomIdLabel.textContent = room.roomId;
   roomCodeBig.textContent = room.roomId;
-
   participantsList.innerHTML = "";
-  const participants = room.participants || {};
-  const ids = Object.keys(participants);
 
+  const ids = Object.keys(room.participants || {});
   ids.forEach((pid) => {
+    const p = room.participants[pid];
     const li = document.createElement("li");
-    const spanName = document.createElement("span");
-    spanName.classList.add("name");
-    spanName.textContent = participants[pid].name || "Anonymous";
-
-    const meta = document.createElement("span");
-    if (pid === currentParticipantId) {
-      meta.innerHTML = `<span class="you">you</span>`;
-    } else {
-      meta.textContent = "";
-    }
-
-    li.appendChild(spanName);
-    li.appendChild(meta);
+    li.innerHTML = `<span class="name">${p.name}</span>${
+      pid === currentParticipantId ? '<span class="you">you</span>' : ""
+    }`;
     participantsList.appendChild(li);
   });
 
-  const count = ids.length;
-
   if (room.status === "waiting") {
-    if (count < 2) {
-      roomStatusText.textContent = "Waiting for your friend to join…";
+    if (ids.length < 2) {
+      roomStatusText.textContent = "Waiting for partner...";
       startGameBtn.classList.add("hidden");
     } else {
-      roomStatusText.textContent =
-        "Both of you are here. You can start the 7-day pact.";
+      roomStatusText.textContent = "Ready to start.";
       startGameBtn.classList.remove("hidden");
     }
-  } else if (room.status === "active") {
-    roomStatusText.textContent = "Pact is in progress.";
-    startGameBtn.classList.add("hidden");
-  } else if (room.status === "finished") {
-    roomStatusText.textContent = "This pact has ended.";
-    startGameBtn.classList.add("hidden");
   }
 }
 
-// ---------- Game: progress + entries ----------
+// ---------- Game Logic ----------
 function attachProgressListener(roomId) {
-  const progRef = ref(db, `rooms/${roomId}/progress/${currentParticipantId}`);
-  onValue(progRef, (snap) => {
-    currentProgress = snap.val() || { currentTaskIndex: 0 };
-    renderTask();
-  });
+  onValue(
+    ref(db, `rooms/${roomId}/progress/${currentParticipantId}`),
+    (snap) => {
+      currentProgress = snap.val() || { currentTaskIndex: 0 };
+      renderTask();
+    }
+  );
 }
 
 function renderGame(room) {
-  const day = computeDay(room.startedAt);
-  currentDayLabel.textContent = day.toString();
+  currentDayLabel.textContent = computeDay(room.startedAt).toString();
   renderTask();
 }
 
 function renderTask() {
-  const idx = currentProgress?.currentTaskIndex ?? 0;
-  const safeIndex = Math.min(TASKS.length - 1, Math.max(0, idx));
-  const task = TASKS[safeIndex];
-
+  const idx = Math.min(
+    TASKS.length - 1,
+    Math.max(0, currentProgress?.currentTaskIndex ?? 0)
+  );
+  const task = TASKS[idx];
   taskTitle.textContent = task.title;
   taskPrompt.textContent = task.prompt;
-  gameInfo.textContent = `You’re on prompt ${safeIndex + 1} of ${TASKS.length}. You can answer at your own pace.`;
 }
 
-// Shared + journal entries listener
 function attachEntriesListener(roomId) {
-  const entriesRef = ref(db, `rooms/${roomId}/entries`);
-  onValue(entriesRef, (snap) => {
-    const entries = snap.val() || {};
-    renderEntries(entries);
+  onValue(ref(db, `rooms/${roomId}/entries`), (snap) => {
+    renderEntries(snap.val() || {});
   });
 }
 
+// *** RENDERING LOGIC ***
 function renderEntries(entries) {
   const all = Object.values(entries);
-  const shared = all.filter(
-    (e) => e.authorId !== currentParticipantId && e.shareWithPartner
-  );
-  const mine = all.filter((e) => e.authorId === currentParticipantId);
+
+  // 1. Shared Chat (My shared + Partner shared)
+  const chatMessages = all
+    .filter((e) => e.shareWithPartner === true)
+    .sort((a, b) => a.createdAt - b.createdAt);
 
   sharedList.innerHTML = "";
-  journalList.innerHTML = "";
-
-  if (shared.length === 0) {
-    sharedList.innerHTML = `<p class="muted small">Your partner hasn’t shared anything yet.</p>`;
+  if (chatMessages.length === 0) {
+    sharedList.innerHTML = `<div class="muted small" style="text-align:center; padding:20px;">No whispers shared yet.</div>`;
   } else {
-    shared
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .forEach((entry) => {
-        const div = document.createElement("div");
-        div.classList.add("whisper-item");
+    chatMessages.forEach((msg, index) => {
+      const isMe = msg.authorId === currentParticipantId;
+      const prevMsg = chatMessages[index - 1];
 
-        const meta = document.createElement("div");
-        meta.classList.add("whisper-meta");
-        meta.innerHTML = `<span>${entry.authorName || "Partner"}</span><span>${formatTime(
-          entry.createdAt
-        )}</span>`;
+      const sameAuthorAsPrev = prevMsg && prevMsg.authorId === msg.authorId;
 
-        const text = document.createElement("div");
-        text.classList.add("whisper-text");
-        text.textContent = entry.text;
+      const bubble = document.createElement("div");
+      bubble.classList.add("chat-bubble");
+      bubble.classList.add(isMe ? "me" : "partner");
 
-        div.appendChild(meta);
-        div.appendChild(text);
-        sharedList.appendChild(div);
-      });
+      if (sameAuthorAsPrev) {
+        bubble.classList.add("block-continue");
+      } else {
+        bubble.classList.add("block-start");
+      }
+
+      bubble.innerHTML = `
+        <div>${msg.text}</div>
+        <div class="bubble-meta">
+          <span>Day ${msg.day || "?"}</span>
+          <span>${formatTime(msg.createdAt)}</span>
+        </div>
+      `;
+      sharedList.appendChild(bubble);
+    });
+    sharedList.scrollTop = sharedList.scrollHeight;
   }
 
-  if (mine.length === 0) {
-    journalList.innerHTML = `<p class="muted small">Your journal is empty. Every response you save or share appears here for you.</p>`;
+  // 2. Private Journal (Only my PRIVATE entries)
+  // UPDATED: Added !e.shareWithPartner so shared ones don't appear here
+  const myPrivateEntries = all
+    .filter((e) => e.authorId === currentParticipantId && !e.shareWithPartner)
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  journalList.innerHTML = "";
+  if (myPrivateEntries.length === 0) {
+    journalList.innerHTML = `<p class="muted small">No private notes yet.</p>`;
   } else {
-    mine
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .forEach((entry) => {
-        const div = document.createElement("div");
-        div.classList.add("whisper-item");
-
-        const visibility = entry.shareWithPartner ? "Shared" : "Private";
-
-        const meta = document.createElement("div");
-        meta.classList.add("whisper-meta");
-        meta.innerHTML = `<span>${visibility}</span><span>${formatTime(
+    myPrivateEntries.forEach((entry) => {
+      const div = document.createElement("div");
+      div.classList.add("whisper-item");
+      // No need to show "Private" label anymore since they are all private
+      div.innerHTML = `
+        <div class="whisper-meta"><span>Private</span><span>${formatTime(
           entry.createdAt
-        )}</span>`;
-
-        const text = document.createElement("div");
-        text.classList.add("whisper-text");
-        text.textContent = entry.text;
-
-        div.appendChild(meta);
-        div.appendChild(text);
-        journalList.appendChild(div);
-      });
+        )}</span></div>
+        <div class="whisper-text">${entry.text}</div>
+      `;
+      journalList.appendChild(div);
+    });
   }
 }
 
 async function handleSubmitResponse(shareWithPartner) {
   if (!currentRoomId || !currentParticipantId) return;
-
   const text = responseInput.value.trim();
-  if (!text) {
-    gameInfo.textContent = "Write something before saving.";
-    return;
-  }
+  if (!text) return;
 
   savePrivateBtn.disabled = true;
   shareWithPartnerBtn.disabled = true;
 
   const now = Date.now();
+  const day = currentDayLabel.textContent || "1";
+
   const entryRef = push(ref(db, `rooms/${currentRoomId}/entries`));
   await set(entryRef, {
     id: entryRef.key,
@@ -522,24 +424,20 @@ async function handleSubmitResponse(shareWithPartner) {
     authorName: currentUser.name,
     text,
     shareWithPartner,
-    createdAt: now
+    createdAt: now,
+    day: day,
   });
 
   responseInput.value = "";
-
   const newIndex = (currentProgress?.currentTaskIndex ?? 0) + 1;
   await update(
     ref(db, `rooms/${currentRoomId}/progress/${currentParticipantId}`),
-    {
-      currentTaskIndex: newIndex,
-      updatedAt: now
-    }
+    { currentTaskIndex: newIndex, updatedAt: now }
   );
 
   gameInfo.textContent = shareWithPartner
-    ? "Saved and shared with your partner."
-    : "Saved privately in your journal.";
-
+    ? "Sent to chat."
+    : "Saved to journal.";
   savePrivateBtn.disabled = false;
   shareWithPartnerBtn.disabled = false;
 }
@@ -547,16 +445,9 @@ async function handleSubmitResponse(shareWithPartner) {
 // ---------- UI utility ----------
 function handleCopyCode() {
   if (!currentRoomId) return;
-  navigator.clipboard
-    .writeText(currentRoomId)
-    .then(() => {
-      roomStatusText.textContent = "Code copied. Send it to your friend.";
-    })
-    .catch(() => {
-      roomStatusText.textContent =
-        "Could not copy code, but you can tell them: " + currentRoomId;
-    });
+  navigator.clipboard.writeText(currentRoomId).catch(() => {});
+  roomStatusText.textContent = "Code copied!";
 }
 
-// On first load, always show setup
+// Init
 switchScreen("setup");
